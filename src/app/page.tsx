@@ -1,12 +1,29 @@
-export default function HomePage() {
+// ARQUIVO: src/app/layout.tsx
+
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+
+import Header from "@/components/Header";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Meu Portfólio",
+  description: "Portfólio de Desenvolvedor Full-Stack",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <h1 className="text-5xl font-extrabold text-center">
-        Meu Portfólio de Desenvolvedor
-      </h1>
-      <p className="mt-4 text-lg text-gray-600">
-        Em breve, uma incrível homepage aqui!
-      </p>
-    </main>
+    <html lang="pt-br">
+      <body className={inter.className}>
+        <Header />
+        {children}
+      </body>
+    </html>
   );
 }
