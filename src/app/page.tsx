@@ -1,4 +1,5 @@
 // src/app/page.tsx
+import Link from "next/link";
 
 // A definição do TIPO continua correta (estrutura plana)
 type Post = {
@@ -45,6 +46,10 @@ export default async function Home() {
                     key={post.id}
                     className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition-shadow"
                   >
+                    <Link
+                      href={`/blog/${post.slug}`}
+                      className="block p-6"
+                    ></Link>
                     <h3 className="text-2xl font-semibold">{post.titulo}</h3>
                   </li>
                 )
