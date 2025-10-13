@@ -6,6 +6,7 @@ import "./globals.css";
 
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
+import Services from "@/components/Services";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Header />
         <Hero />
+        <Services />
         {children}
       </body>
     </html>
