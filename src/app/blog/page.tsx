@@ -139,17 +139,39 @@ export default async function BlogPage({
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {data.map((item) => {
-                const a = item.attributes as PostAttrs;
-                const title = (a as any)[TITLE_FIELD] as string;
-                const slug = (a as any)[SLUG_FIELD] as string;
+                // A CORREÇÃO ESTÁ AQUI: 'a' agora é o próprio 'item', pois sua API não tem a camada 'attributes'.
+                const a = item as any; // Usamos 'any' aqui para simplificar, pois a estrutura real é diferente da esperada pelo tipo PostAttrs.
+
+                const title = a[TITLE_FIELD] as string;
+                const slug = a[SLUG_FIELD] as string;
+
+                // A função buildImageUrl precisa receber o objeto da imagem diretamente.
+                // Precisamos simular a estrutura que a função espera.
+                const coverFile = a[COVER_FIELD]
+                  ? { data: { attributes: a[COVER_FIELD] } }
+                  : null;
                 const cover = buildImageUrl(
-                  (a as any)[COVER_FIELD] as StrapiFile<StrapiImage>
+                  coverFile as StrapiFile<StrapiImage>
                 );
-                const excerpt = blocksToExcerpt((a as any)[CONTENT_FIELD]);
+
+                const excerpt = blocksToExcerpt(a[CONTENT_FIELD]);
+                type MediaV5 = {
+                  url: string;
+                  alternativeText?: string | null;
+                  width?: number;
+                  height?: number;
+                };
+
+                const mediaUrl = (m?: MediaV5 | null) =>
+                  m?.url
+                    ? m.url.startsWith("http")
+                      ? m.url
+                      : `${BASE}${m.url}`
+                    : null;
 
                 return (
                   <article
-                    key={item.id}
+                    key={item.id} // Usamos item.id que ainda existe
                     className="group overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/20"
                   >
                     {cover && (
