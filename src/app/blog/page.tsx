@@ -155,19 +155,6 @@ export default async function BlogPage({
                 );
 
                 const excerpt = blocksToExcerpt(a[CONTENT_FIELD]);
-                type MediaV5 = {
-                  url: string;
-                  alternativeText?: string | null;
-                  width?: number;
-                  height?: number;
-                };
-
-                const mediaUrl = (m?: MediaV5 | null) =>
-                  m?.url
-                    ? m.url.startsWith("http")
-                      ? m.url
-                      : `${BASE}${m.url}`
-                    : null;
 
                 return (
                   <article
