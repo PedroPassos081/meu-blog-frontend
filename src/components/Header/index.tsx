@@ -86,7 +86,7 @@ export default function Header() {
           ))}
 
           <Link
-            href="/contato"
+            href="/contact"
             className="bg-accent text-white font-semibold px-4 py-2 rounded-xl shadow-md transition-[opacity,transform] hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 active:scale-[0.98]"
           >
             Contato
@@ -143,7 +143,7 @@ export default function Header() {
           ))}
 
           <Link
-            href="/contato"
+            href="/contact"
             className="mt-2 bg-accent text-white text-center font-semibold px-4 py-2 rounded-xl shadow-md hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Contato
