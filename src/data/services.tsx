@@ -125,7 +125,6 @@ export const SERVICES: ServiceItem[] = [
       },
     ],
   },
-  // …adicione features nos outros serviços quando quiser
 ];
 
 export const getServiceBySlug = (slug: string) =>

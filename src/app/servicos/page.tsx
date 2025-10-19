@@ -1,5 +1,5 @@
 // src/app/servicos/page.tsx
-import Services from "@/components/Services";
+import Services from "@/sections/Services";
 import Link from "next/link";
 
 export default function ServicosHub() {

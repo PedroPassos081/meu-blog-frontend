@@ -5,9 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-const nav = [
+type NavItem = { href: string; label: string };
+
+const nav: NavItem[] = [
   { href: "/", label: "Home" },
-  { href: "/sobre", label: "Sobre Nós" },
+  { href: "/#about", label: "Sobre Nós" }, 
   { href: "/servicos", label: "Serviços" },
   { href: "/blog", label: "Blog" },
 ];
@@ -16,6 +18,7 @@ export default function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [hash, setHash] = useState<string>("");
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 6);
@@ -29,8 +32,27 @@ export default function Header() {
     setOpen(false);
   }, [pathname]);
 
-  const active = (href: string) =>
-    pathname === href
+  // acompanha mudanças de hash (para ativar "Sobre Nós" quando #sobre-nos estiver ativo)
+  useEffect(() => {
+    const update = () => setHash(window.location.hash || "");
+    update();
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
+
+  // regra de "ativo" que considera âncoras na Home
+  const isActive = (href: string) => {
+    const hasAnchor = href.includes("#");
+    if (!hasAnchor) {
+      return pathname === href;
+    }
+    // ex.: "/#sobre-nos" → ativo quando estou na "/" e hash === "#sobre-nos"
+    const [base, anchor] = href.split("#");
+    return pathname === (base || "/") && hash === `#${anchor}`;
+  };
+
+  const itemClass = (href: string) =>
+    isActive(href)
       ? "text-primary font-semibold"
       : "text-text-main hover:text-primary";
 
@@ -55,7 +77,7 @@ export default function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`${active(
+              className={`${itemClass(
                 item.href
               )} transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 rounded-md`}
             >
@@ -112,7 +134,7 @@ export default function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={`${active(
+              className={`${itemClass(
                 item.href
               )} py-2 transition-colors rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/60`}
             >
