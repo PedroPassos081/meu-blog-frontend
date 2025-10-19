@@ -1,9 +1,12 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
+
 import Header from "@/components/Header";
-// import { Inter } from "next/font/google";
-// const inter = Inter({ subsets: ["latin"] });
+import Footer from "@/components/Footer";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "VET Dev",
@@ -17,8 +20,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <Header />
-      <body>{children}</body>
+      <body className={inter.className}>
+        <Header />
+        {children}
+        <Footer />
+      </body>
     </html>
   );
 }
