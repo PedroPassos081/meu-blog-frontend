@@ -64,8 +64,8 @@ export default function Footer() {
         <div>
           <h4 className="text-base font-semibold text-primary">Contato</h4>
           <ul className="mt-4 space-y-3 text-sm text-text-main/80">
-            <li><strong>Telefone:</strong> (00) 0000-0000</li>
-            <li><strong>WhatsApp:</strong> (00) 9 8971-4251</li>
+            <li><strong>Telefone:</strong> (81) 9 8971-4251</li>
+            <li><strong>WhatsApp:</strong> (81) 9 8971-4251</li>
             <li><strong>E-mail:</strong> pedro.passos081@gmail.com</li>
             <li><strong>Endereço:</strong><br /> Rua Exemplo, 123 — Recife/PE</li>
             <li><strong>Horário:</strong><br /> Seg–Sex 8h–18h | Sáb 8h–12h</li>
