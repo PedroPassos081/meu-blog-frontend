@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 
-import Header from "@/components/Header";
 import Hero from "@/sections/Hero";
 import Services from "@/sections/Services";
 import About from "@/sections/About";
@@ -22,7 +21,6 @@ export default function RootLayout({
 }) {
   return (
     <>
-      <Header />
       <Hero />
       <Services />
       {children}

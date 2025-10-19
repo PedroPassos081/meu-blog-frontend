@@ -1,7 +1,7 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
-// opcional: fonte
+import Header from "@/components/Header";
 // import { Inter } from "next/font/google";
 // const inter = Inter({ subsets: ["latin"] });
 
@@ -17,7 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      {/* <body className={inter.className}> */}
+      <Header />
       <body>{children}</body>
     </html>
   );
