@@ -8,6 +8,7 @@ import Hero from "@/sections/Hero";
 import Services from "@/sections/Services";
 import About from "@/sections/About";
 import Contact from "./contact/page";
+import BlogPage from "./blog/page";
 
 export const metadata: Metadata = {
   title: "VET Dev",
@@ -25,6 +26,7 @@ export default function RootLayout({
       <Services />
       {children}
       <About id="about"/>
+      <BlogPage />
       <Contact />
       
     </>
