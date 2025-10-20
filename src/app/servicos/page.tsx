@@ -16,7 +16,7 @@ export default function ServicosHub() {
           </p>
           <div className="mt-4">
             <Link
-              href="/contato"
+              href="/contact"
               className="rounded-xl bg-accent px-6 py-3 font-semibold text-white shadow-md hover:opacity-90"
             >
               Agendar consulta
