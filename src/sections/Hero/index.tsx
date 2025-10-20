@@ -51,7 +51,7 @@ export default function Hero() {
             {/* CTAs */}
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/contato"
+                href="/contact"
                 className="bg-accent text-white font-semibold px-6 py-3 rounded-xl shadow-md hover:opacity-90 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 Agendar consulta
