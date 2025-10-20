@@ -1,22 +1,24 @@
-// ARQUIVO: src/app/blog/[slug]/page.tsx
+import Link from "next/link";
+import Image from "next/image";
+import { BlocksRenderer } from "@strapi/blocks-react-renderer";
+import type { BlocksContent } from "@strapi/blocks-react-renderer";
 
-import Link from 'next/link';
-import Image from 'next/image';
-import { BlocksRenderer } from '@strapi/blocks-react-renderer';
-
+/* ========= Tipos ========= */
 type StrapiImage = {
   url: string;
   alternativeText?: string;
 };
 
+
 type FlatPost = {
   id: number;
   titulo: string;
-  conteudo: any;
+  conteudo: BlocksContent | null;
   slug: string;
   imagem_destaque?: StrapiImage | null;
 };
 
+/* ========= Utils ========= */
 function buildImageUrl(file?: StrapiImage | null) {
   const url = file?.url;
   if (!url) return null;
@@ -24,21 +26,32 @@ function buildImageUrl(file?: StrapiImage | null) {
   return url.startsWith("http") ? url : `${strapiUrl}${url}`;
 }
 
+/* ========= Fetch ========= */
 async function getPost(slug: string): Promise<FlatPost | null> {
   try {
     const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
-    const res = await fetch(`${strapiUrl}/api/posts?filters[slug][$eq]=${slug}&populate=imagem_destaque`, {
-      next: { revalidate: 60 },
-    });
 
-    if (!res.ok) throw new Error('Falha ao buscar o post');
+    const res = await fetch(
+      `${strapiUrl}/api/posts?filters[slug][$eq]=${slug}&populate=imagem_destaque`,
+      { next: { revalidate: 60 } }
+    );
 
-    const data = await res.json();
+    if (!res.ok) throw new Error("Falha ao buscar o post");
+
+    const data = (await res.json()) as {
+      data: {
+        id: number;
+        attributes?: Omit<FlatPost, "id">;
+      }[];
+    };
+
     if (data.data && data.data.length > 0) {
-      // ⚠️ Alguns Strapi retornam atributos dentro de "attributes"
-      const raw = data.data[0];
-      return raw.attributes ? { id: raw.id, ...raw.attributes } : raw;
-    }
+  const raw = data.data[0];
+  return raw.attributes
+    ? ({ id: raw.id, ...raw.attributes } as FlatPost)
+    : (raw as FlatPost); // caso sua API já venha “flat”
+}
+
 
     return null;
   } catch (error) {
@@ -47,6 +60,7 @@ async function getPost(slug: string): Promise<FlatPost | null> {
   }
 }
 
+/* ========= Página ========= */
 export default async function PostPage({ params }: { params: { slug: string } }) {
   const post = await getPost(params.slug);
 
@@ -66,7 +80,6 @@ export default async function PostPage({ params }: { params: { slug: string } })
   return (
     <main className="flex min-h-screen flex-col items-center p-8 sm:p-24 bg-[--color-surface] text-[--color-text-main]">
       <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-sm ring-1 ring-black/5">
-        
         {/* ===== BOTÃO DE VOLTAR (TOPO) ===== */}
         <div className="mb-8">
           <Link
@@ -109,8 +122,8 @@ export default async function PostPage({ params }: { params: { slug: string } })
 
         {/* ===== CONTEÚDO ===== */}
         <div className="prose prose-lg max-w-none text-[--color-text-main] prose-headings:text-[--color-primary] prose-a:text-[--color-accent] hover:prose-a:underline">
-          {post.conteudo && <BlocksRenderer content={post.conteudo} />}
-        </div>
+  {post.conteudo && <BlocksRenderer content={post.conteudo} />} 
+</div>
 
         {/* ===== BOTÃO DE VOLTAR (FINAL) ===== */}
         <div className="mt-12 border-t pt-6 flex justify-center">
