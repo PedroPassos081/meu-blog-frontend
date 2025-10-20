@@ -22,7 +22,7 @@ function JsonLd() {
     name: "VET Dev",
     url: "https://seu-dominio.com",
     telephone: "+55-00-0000-0000",
-    email: "contato@vetdev.com",
+    email: "pedro.passos081@gmail.com",
     address: {
       "@type": "PostalAddress",
       streetAddress: "Rua Exemplo, 123",
@@ -35,7 +35,7 @@ function JsonLd() {
     sameAs: [
       "https://www.instagram.com/seu_perfil",
       "https://www.facebook.com/seu_perfil",
-      "https://wa.me/550000000000",
+      "https://wa.me/5581989714251"
     ],
   };
   return (
@@ -261,7 +261,7 @@ export default function Contact() {
                 Chame no WhatsApp e será atendido pela nossa equipe.
               </p>
               <Link
-                href="https://wa.me/558198971-4251"
+                href="https://wa.me/5581989714251"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-4 inline-flex items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent/90"

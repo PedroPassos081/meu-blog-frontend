@@ -2,34 +2,46 @@ import Image from "next/image";
 import Link from "next/link";
 
 const BASE = process.env.NEXT_PUBLIC_STRAPI_URL;
-if (!BASE)
-  throw new Error("Defina NEXT_PUBLIC_STRAPI_URL no .env.local (ex.: http://localhost:1337)");
+if (!BASE) throw new Error("Defina NEXT_PUBLIC_STRAPI_URL no .env.local (ex.: http://localhost:1337)");
 
-const CONTENT_UID = "posts";
-const COVER_FIELD = "imagem_destaque";
-const TITLE_FIELD = "titulo";
-const SLUG_FIELD = "slug";
-const CONTENT_FIELD = "conteudo";
-const DEFAULT_PAGE_SIZE = 9;
+const CONTENT_UID = "posts" as const;
+const COVER_FIELD = "imagem_destaque" as const;
+const TITLE_FIELD = "titulo" as const;
+const SLUG_FIELD = "slug" as const;
+const CONTENT_FIELD = "conteudo" as const;
+const DEFAULT_PAGE_SIZE = 9 as const;
 
-// ========== tipos ==========
+/* ===================== Tipos ===================== */
+
 type StrapiImage = { url: string; alternativeText?: string };
 type StrapiFile<T> = { data?: { attributes: T } | null } | null;
 
 type PostAttrs = {
   [TITLE_FIELD]: string;
   [SLUG_FIELD]: string;
-  [CONTENT_FIELD]?: any;
+  [CONTENT_FIELD]?: unknown;                 // ← sem any
   publishedAt: string;
-  [COVER_FIELD]?: StrapiFile<StrapiImage>;
+  [COVER_FIELD]?: StrapiFile<StrapiImage> | StrapiImage | null; // suporta flatten ou data/attributes
 };
 
+type PostItem =
+  | { id: number; attributes: PostAttrs } // formato padrão do Strapi
+  | ({ id: number } & PostAttrs);         // formato “flat” (algumas APIs custom)
+
 type StrapiListResponse = {
-  data: { id: number; attributes: PostAttrs }[];
+  data: PostItem[];
   meta: { pagination: { page: number; pageCount: number; pageSize: number; total: number } };
 };
 
-// ========== utils ==========
+/* ===== Rich Text (blocagem) – tipos simples só pro que usamos ===== */
+type RTTextNode = { text?: string };
+type RTNode = {
+  type?: string;
+  children?: RTNode[] | RTTextNode[];
+};
+
+/* ===================== Utils ===================== */
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString("pt-BR", {
@@ -42,30 +54,64 @@ function formatDate(iso: string) {
   }
 }
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/** Converte mídia em ambos os formatos (flatten e data/attributes) para o formato StrapiFile esperado */
+function toMediaField(img: unknown): StrapiFile<StrapiImage> | null {
+  if (!img) return null;
+  if (isObject(img) && "data" in img) {
+    return img as StrapiFile<StrapiImage>;
+  }
+  if (isObject(img) && "url" in img) {
+    const i = img as StrapiImage;
+    return { data: { attributes: i } };
+  }
+  return null;
+}
+
 function buildImageUrl(file?: StrapiFile<StrapiImage>) {
   const url = file?.data?.attributes?.url;
   return url ? (url.startsWith("http") ? url : `${BASE}${url}`) : null;
 }
 
-function blocksToExcerpt(blocks: any, max = 180) {
-  try {
-    const texts: string[] = [];
-    const traverse = (node: any) => {
-      if (!node) return;
-      if (Array.isArray(node)) node.forEach(traverse);
-      else if (typeof node === "object") {
-        if (node.type === "paragraph" && Array.isArray(node.children)) {
-          texts.push(node.children.map((c: any) => c.text ?? "").join(""));
-        }
-        if (node.children) traverse(node.children);
+function isRTNode(n: unknown): n is RTNode {
+  return isObject(n);
+}
+
+/** Extrai um resumo (primeiros parágrafos) do rich text tipado */
+function blocksToExcerpt(blocks: unknown, max = 180) {
+  if (!blocks) return "";
+  const texts: string[] = [];
+
+  const traverse = (node: unknown): void => {
+    if (!node) return;
+
+    if (Array.isArray(node)) {
+      node.forEach(traverse);
+      return;
+    }
+
+    if (isRTNode(node)) {
+      if (node.type === "paragraph" && Array.isArray(node.children)) {
+        const t = node.children
+          .map((c) => (isObject(c) && "text" in c ? String((c as RTTextNode).text ?? "") : ""))
+          .join("");
+        if (t.trim()) texts.push(t);
       }
-    };
-    traverse(blocks);
-    const joined = texts.join(" ").trim();
-    return joined.length > max ? `${joined.slice(0, max).trim()}…` : joined;
-  } catch {
-    return "";
-  }
+      if (node.children) traverse(node.children);
+    }
+  };
+
+  traverse(blocks);
+  const joined = texts.join(" ").trim();
+  return joined.length > max ? `${joined.slice(0, max).trim()}…` : joined;
+}
+
+/** Normaliza o item do Strapi para sempre termos `a` como atributos */
+function getAttrs(item: PostItem): PostAttrs {
+  return "attributes" in item ? item.attributes : item;
 }
 
 async function getPosts(page: number, pageSize: number): Promise<StrapiListResponse> {
@@ -81,7 +127,8 @@ async function getPosts(page: number, pageSize: number): Promise<StrapiListRespo
   return res.json();
 }
 
-// ========== página ==========
+/* ===================== Página ===================== */
+
 export default async function BlogPage({
   searchParams,
 }: {
@@ -116,14 +163,12 @@ export default async function BlogPage({
           ) : (
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {data.map((item, i) => {
-                const a = item as any;
+                const a = getAttrs(item);
                 const title = a[TITLE_FIELD];
                 const slug = a[SLUG_FIELD];
-                const coverFile = a[COVER_FIELD]
-                  ? { data: { attributes: a[COVER_FIELD] } }
-                  : null;
-                const cover = buildImageUrl(coverFile as StrapiFile<StrapiImage>);
+                const cover = buildImageUrl(toMediaField(a[COVER_FIELD]));
                 const excerpt = blocksToExcerpt(a[CONTENT_FIELD]);
+
                 return (
                   <article
                     key={item.id}
@@ -169,19 +214,8 @@ export default async function BlogPage({
                           className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
                         >
                           Ler artigo
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            className="transition group-hover:translate-x-0.5"
-                          >
-                            <path
-                              d="M5 12h14M13 5l7 7-7 7"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                            />
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="transition group-hover:translate-x-0.5">
+                            <path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
                         </Link>
                       </div>
@@ -211,10 +245,7 @@ export default async function BlogPage({
 
       {/* BOTÃO VOLTAR AO TOPO */}
       <div className="flex justify-center pb-16">
-        <Link
-          href="#top"
-          className="rounded-full bg-primary/10 px-4 py-2 text-sm text-primary transition hover:bg-primary/20"
-        >
+        <Link href="#top" className="rounded-full bg-primary/10 px-4 py-2 text-sm text-primary transition hover:bg-primary/20">
           ↑ Voltar ao topo
         </Link>
       </div>
@@ -222,7 +253,8 @@ export default async function BlogPage({
   );
 }
 
-// ========== componentes auxiliares ==========
+/* ===================== Auxiliares ===================== */
+
 function PagerLink({
   targetPage,
   disabled,
@@ -234,14 +266,9 @@ function PagerLink({
 }) {
   const base =
     "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
-  if (disabled)
-    return <span className={`${base} cursor-not-allowed text-text-main/40`}>{children}</span>;
+  if (disabled) return <span className={`${base} cursor-not-allowed text-text-main/40`}>{children}</span>;
   return (
-    <Link
-      href={`/blog?page=${targetPage}`}
-      className={`${base} text-primary hover:bg-primary/5`}
-      scroll={false}
-    >
+    <Link href={`/blog?page=${targetPage}`} className={`${base} text-primary hover:bg-primary/5`} scroll={false}>
       {children}
     </Link>
   );
