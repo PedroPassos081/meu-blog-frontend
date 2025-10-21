@@ -1,4 +1,4 @@
-// ARQUIVO: src/app/layout.tsx
+// ARQUIVO: src/app/page.tsx
 
 import type { Metadata } from "next";
 
@@ -25,10 +25,9 @@ export default function RootLayout({
       <Hero />
       <Services />
       {children}
-      <About id="about"/>
+      <About id="about" />
       <BlogPage />
       <Contact />
-      
     </>
   );
 }

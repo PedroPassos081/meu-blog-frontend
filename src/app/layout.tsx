@@ -24,7 +24,10 @@ export default function RootLayout({
       <body className={inter.className}>
         <Header />
         {children}
-        <WhatsAppFab phone="550000000000" message="Olá! Quero agendar uma consulta 🐶" />
+        <WhatsAppFab
+          phone="5581989714251"
+          message="Olá! Quero agendar uma consulta 🐶"
+        />
         <Footer />
       </body>
     </html>

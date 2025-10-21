@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getServiceBySlug, SERVICES } from "@/data/services";
+import { getServiceBySlug, SERVICES } from "@/lib/data/services";
 
 type Props = { params: { slug: string } };
 
