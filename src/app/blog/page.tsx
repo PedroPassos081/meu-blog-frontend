@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 const BASE = process.env.NEXT_PUBLIC_STRAPI_URL;
-if (!BASE) throw new Error("Defina NEXT_PUBLIC_STRAPI_URL no .env.local (ex.: http://localhost:1337)");
+
 
 const CONTENT_UID = "posts" as const;
 const COVER_FIELD = "imagem_destaque" as const;
