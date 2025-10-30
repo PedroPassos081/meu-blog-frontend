@@ -35,7 +35,7 @@ function JsonLd() {
     sameAs: [
       "https://www.instagram.com/seu_perfil",
       "https://www.facebook.com/seu_perfil",
-      "https://wa.me/5581989714251"
+      "https://wa.me/5581989714251",
     ],
   };
   return (
@@ -62,8 +62,8 @@ export default function Contact() {
             Estamos aqui para ajudar você e seu pet
           </h1>
           <p className="mt-3 max-w-2xl text-text-main/80">
-            Tire dúvidas, agende uma consulta e receba orientações personalizadas.
-            Responderemos o quanto antes.
+            Tire dúvidas, agende uma consulta e receba orientações
+            personalizadas. Responderemos o quanto antes.
           </p>
         </div>
       </section>
@@ -112,15 +112,16 @@ export default function Contact() {
           {/* FORM */}
           <div className="lg:col-span-2">
             <div className="rounded-3xl bg-white p-6 shadow-[0_10px_30px_rgba(0,0,0,0.06)] ring-1 ring-black/5 md:p-8">
-              <h2 className="text-xl font-bold text-primary">Envie uma mensagem</h2>
+              <h2 className="text-xl font-bold text-primary">
+                Envie uma mensagem
+              </h2>
               <p className="mt-1 text-sm text-text-main/75">
                 Preencha os campos abaixo e nossa equipe entrará em contato.
               </p>
 
-              {/* Dica: troque action para seu endpoint (Formspree, API route, etc.) */}
               <form
                 className="mt-6 space-y-4"
-                action="mailto:contato@vetdev.com"
+                action="mailto:pedro.passos081@gmail.com"
                 method="post"
                 encType="text/plain"
               >
@@ -202,7 +203,10 @@ export default function Contact() {
                   </button>
                   <p className="text-xs text-text-main/60">
                     Ao enviar, você concorda com nossa{" "}
-                    <Link href="/politica-de-privacidade" className="text-primary underline">
+                    <Link
+                      href="/politica-de-privacidade"
+                      className="text-primary underline"
+                    >
                       Política de Privacidade
                     </Link>
                     .
@@ -216,7 +220,9 @@ export default function Contact() {
           <aside className="space-y-6">
             {/* Endereço / horários */}
             <div className="rounded-2xl bg-white p-6 ring-1 ring-black/5">
-              <h3 className="text-base font-semibold text-primary">Informações</h3>
+              <h3 className="text-base font-semibold text-primary">
+                Informações
+              </h3>
               <ul className="mt-4 space-y-3 text-sm">
                 <li>
                   <strong>Endereço:</strong> Rua Exemplo, 123 — Cidade/UF
@@ -241,14 +247,22 @@ export default function Contact() {
 
             {/* FAQ */}
             <div className="rounded-2xl bg-white p-6 ring-1 ring-black/5">
-              <h3 className="text-base font-semibold text-primary">Dúvidas comuns</h3>
+              <h3 className="text-base font-semibold text-primary">
+                Dúvidas comuns
+              </h3>
               <ul className="mt-4 divide-y divide-primary/10">
-                <Faq q="Atendem emergência?"
-                     a="Sim. Sugerimos ligar antes para orientações imediatas e preparo da equipe." />
-                <Faq q="Quais formas de pagamento?"
-                     a="Cartões, PIX e boleto (planos). Fale conosco se precisar de outras opções." />
-                <Faq q="Emitimos certificado de viagem?"
-                     a="Sim, nacional e internacional. Traga a carteirinha de vacinação e documentos." />
+                <Faq
+                  q="Atendem emergência?"
+                  a="Sim. Sugerimos ligar antes para orientações imediatas e preparo da equipe."
+                />
+                <Faq
+                  q="Quais formas de pagamento?"
+                  a="Cartões, PIX e boleto (planos). Fale conosco se precisar de outras opções."
+                />
+                <Faq
+                  q="Emitimos certificado de viagem?"
+                  a="Sim, nacional e internacional. Traga a carteirinha de vacinação e documentos."
+                />
               </ul>
             </div>
 
