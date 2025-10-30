@@ -1,8 +1,15 @@
+// src/app/blog/page.tsx
 import Image from "next/image";
 import Link from "next/link";
 
-const BASE = process.env.NEXT_PUBLIC_STRAPI_URL;
-
+/* ===================== Config ===================== */
+function getBase() {
+  return process.env.NEXT_PUBLIC_STRAPI_URL || "";
+}
+function getToken() {
+  // Se configurar STRAPI_API_TOKEN na Render, o front enviará Authorization: Bearer
+  return process.env.STRAPI_API_TOKEN || "";
+}
 
 const CONTENT_UID = "posts" as const;
 const COVER_FIELD = "imagem_destaque" as const;
@@ -12,36 +19,38 @@ const CONTENT_FIELD = "conteudo" as const;
 const DEFAULT_PAGE_SIZE = 9 as const;
 
 /* ===================== Tipos ===================== */
-
 type StrapiImage = { url: string; alternativeText?: string };
 type StrapiFile<T> = { data?: { attributes: T } | null } | null;
 
 type PostAttrs = {
   [TITLE_FIELD]: string;
   [SLUG_FIELD]: string;
-  [CONTENT_FIELD]?: unknown;                 // ← sem any
+  [CONTENT_FIELD]?: unknown;
   publishedAt: string;
-  [COVER_FIELD]?: StrapiFile<StrapiImage> | StrapiImage | null; // suporta flatten ou data/attributes
+  [COVER_FIELD]?: StrapiFile<StrapiImage> | StrapiImage | null;
 };
 
 type PostItem =
   | { id: number; attributes: PostAttrs } // formato padrão do Strapi
-  | ({ id: number } & PostAttrs);         // formato “flat” (algumas APIs custom)
+  | ({ id: number } & PostAttrs); // formato “flat”
 
 type StrapiListResponse = {
   data: PostItem[];
-  meta: { pagination: { page: number; pageCount: number; pageSize: number; total: number } };
+  meta: {
+    pagination: {
+      page: number;
+      pageCount: number;
+      pageSize: number;
+      total: number;
+    };
+  };
 };
 
-/* ===== Rich Text (blocagem) – tipos simples só pro que usamos ===== */
+/* ===== Rich Text – tipos simples para o que usamos ===== */
 type RTTextNode = { text?: string };
-type RTNode = {
-  type?: string;
-  children?: RTNode[] | RTTextNode[];
-};
+type RTNode = { type?: string; children?: RTNode[] | RTTextNode[] };
 
 /* ===================== Utils ===================== */
-
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleDateString("pt-BR", {
@@ -53,99 +62,122 @@ function formatDate(iso: string) {
     return iso;
   }
 }
-
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
-
-/** Converte mídia em ambos os formatos (flatten e data/attributes) para o formato StrapiFile esperado */
+/** Converte mídia em ambos formatos (flatten e data/attributes) para StrapiFile */
 function toMediaField(img: unknown): StrapiFile<StrapiImage> | null {
   if (!img) return null;
-  if (isObject(img) && "data" in img) {
-    return img as StrapiFile<StrapiImage>;
-  }
-  if (isObject(img) && "url" in img) {
-    const i = img as StrapiImage;
-    return { data: { attributes: i } };
-  }
+  if (isObject(img) && "data" in img) return img as StrapiFile<StrapiImage>;
+  if (isObject(img) && "url" in img)
+    return { data: { attributes: img as StrapiImage } };
   return null;
 }
-
 function buildImageUrl(file?: StrapiFile<StrapiImage>) {
+  const BASE = getBase();
   const url = file?.data?.attributes?.url;
   return url ? (url.startsWith("http") ? url : `${BASE}${url}`) : null;
 }
-
 function isRTNode(n: unknown): n is RTNode {
   return isObject(n);
 }
-
-/** Extrai um resumo (primeiros parágrafos) do rich text tipado */
+/** Extrai um resumo do rich text tipado */
 function blocksToExcerpt(blocks: unknown, max = 180) {
   if (!blocks) return "";
   const texts: string[] = [];
-
   const traverse = (node: unknown): void => {
     if (!node) return;
-
-    if (Array.isArray(node)) {
-      node.forEach(traverse);
-      return;
-    }
-
+    if (Array.isArray(node)) return void node.forEach(traverse);
     if (isRTNode(node)) {
       if (node.type === "paragraph" && Array.isArray(node.children)) {
         const t = node.children
-          .map((c) => (isObject(c) && "text" in c ? String((c as RTTextNode).text ?? "") : ""))
+          .map((c) =>
+            isObject(c) && "text" in c
+              ? String((c as RTTextNode).text ?? "")
+              : ""
+          )
           .join("");
         if (t.trim()) texts.push(t);
       }
       if (node.children) traverse(node.children);
     }
   };
-
   traverse(blocks);
   const joined = texts.join(" ").trim();
   return joined.length > max ? `${joined.slice(0, max).trim()}…` : joined;
 }
-
 /** Normaliza o item do Strapi para sempre termos `a` como atributos */
 function getAttrs(item: PostItem): PostAttrs {
   return "attributes" in item ? item.attributes : item;
 }
 
-async function getPosts(page: number, pageSize: number): Promise<StrapiListResponse> {
+/* ===================== Data ===================== */
+async function getPosts(
+  page: number,
+  pageSize: number
+): Promise<StrapiListResponse> {
+  const BASE = getBase();
+  // Sem BASE configurada → devolve vazio (não quebra o build)
+  if (!BASE) {
+    return {
+      data: [],
+      meta: { pagination: { page, pageSize, pageCount: 1, total: 0 } },
+    };
+  }
+
   const qs = new URLSearchParams({
     sort: "publishedAt:desc",
     "pagination[page]": String(page),
     "pagination[pageSize]": String(pageSize),
     [`populate[${COVER_FIELD}]`]: "true",
   });
+
+  const headers: HeadersInit = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const url = `${BASE}/api/${CONTENT_UID}?${qs}`;
-  const res = await fetch(url, { next: { revalidate: 60 } });
-  if (!res.ok) throw new Error(`Erro Strapi ${res.status}: ${await res.text()}`);
+  const res = await fetch(url, { headers, next: { revalidate: 60 } });
+
+  if (!res.ok) {
+    // 403 normalmente é permissão pública desabilitada ou falta de token
+    if (res.status === 403) {
+      console.warn(
+        "Strapi 403: habilite find/findOne em Public ou configure STRAPI_API_TOKEN."
+      );
+      return {
+        data: [],
+        meta: { pagination: { page, pageSize, pageCount: 1, total: 0 } },
+      };
+    }
+    throw new Error(`Erro Strapi ${res.status}: ${await res.text()}`);
+  }
   return res.json();
 }
 
 /* ===================== Página ===================== */
-
 export default async function BlogPage({
   searchParams,
 }: {
   searchParams?: { page?: string; pageSize?: string };
 }) {
   const page = Math.max(1, Number(searchParams?.page ?? 1));
-  const pageSize = Math.min(24, Math.max(3, Number(searchParams?.pageSize ?? DEFAULT_PAGE_SIZE)));
+  const pageSize = Math.min(
+    24,
+    Math.max(3, Number(searchParams?.pageSize ?? DEFAULT_PAGE_SIZE))
+  );
 
   const { data, meta } = await getPosts(page, pageSize);
   const { pageCount } = meta.pagination;
+
+  const BASE = getBase();
 
   return (
     <main className="bg-surface text-text-main">
       {/* HERO */}
       <section className="border-b border-black/5 bg-white">
         <div className="mx-auto max-w-7xl px-6 py-12 md:py-16">
-          <h1 className="text-3xl font-extrabold tracking-tight text-primary md:text-4xl">
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-primary">
             Blog da VET Dev
           </h1>
           <p className="mt-3 max-w-[70ch] text-text-main/85">
@@ -159,7 +191,11 @@ export default async function BlogPage({
       <section className="py-12 md:py-16">
         <div className="mx-auto max-w-7xl px-6">
           {data.length === 0 ? (
-            <p className="text-text-main/70">Nenhum post publicado ainda.</p>
+            <p className="text-text-main/70">
+              {!BASE
+                ? "Blog indisponível: configure NEXT_PUBLIC_STRAPI_URL no ambiente."
+                : "Nenhum post publicado ainda."}
+            </p>
           ) : (
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {data.map((item, i) => {
@@ -175,7 +211,10 @@ export default async function BlogPage({
                     className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:ring-primary/20"
                   >
                     {cover && (
-                      <Link href={`/blog/${slug}`} className="block overflow-hidden">
+                      <Link
+                        href={`/blog/${slug}`}
+                        className="block overflow-hidden"
+                      >
                         <Image
                           src={cover}
                           alt={title}
@@ -190,7 +229,9 @@ export default async function BlogPage({
 
                     <div className="flex flex-col flex-1 p-6">
                       <div className="mb-2 flex items-center justify-between text-xs text-text-main/60">
-                        <time dateTime={a.publishedAt}>{formatDate(a.publishedAt)}</time>
+                        <time dateTime={a.publishedAt}>
+                          {formatDate(a.publishedAt)}
+                        </time>
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
                           Artigo
                         </span>
@@ -214,8 +255,19 @@ export default async function BlogPage({
                           className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 rounded"
                         >
                           Ler artigo
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="transition group-hover:translate-x-0.5">
-                            <path d="M5 12h14M13 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            className="transition group-hover:translate-x-0.5"
+                          >
+                            <path
+                              d="M5 12h14M13 5l7 7-7 7"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
                           </svg>
                         </Link>
                       </div>
@@ -233,7 +285,8 @@ export default async function BlogPage({
                 ← Anterior
               </PagerLink>
               <span className="text-sm text-text-main/70">
-                Página <strong className="text-text-main">{page}</strong> de {pageCount}
+                Página <strong className="text-text-main">{page}</strong> de{" "}
+                {pageCount}
               </span>
               <PagerLink targetPage={page + 1} disabled={page >= pageCount}>
                 Próxima →
@@ -245,7 +298,10 @@ export default async function BlogPage({
 
       {/* BOTÃO VOLTAR AO TOPO */}
       <div className="flex justify-center pb-16">
-        <Link href="#top" className="rounded-full bg-primary/10 px-4 py-2 text-sm text-primary transition hover:bg-primary/20">
+        <Link
+          href="#top"
+          className="rounded-full bg-primary/10 px-4 py-2 text-sm text-primary transition hover:bg-primary/20"
+        >
           ↑ Voltar ao topo
         </Link>
       </div>
@@ -254,7 +310,6 @@ export default async function BlogPage({
 }
 
 /* ===================== Auxiliares ===================== */
-
 function PagerLink({
   targetPage,
   disabled,
@@ -266,9 +321,18 @@ function PagerLink({
 }) {
   const base =
     "inline-flex items-center rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
-  if (disabled) return <span className={`${base} cursor-not-allowed text-text-main/40`}>{children}</span>;
+  if (disabled)
+    return (
+      <span className={`${base} cursor-not-allowed text-text-main/40`}>
+        {children}
+      </span>
+    );
   return (
-    <Link href={`/blog?page=${targetPage}`} className={`${base} text-primary hover:bg-primary/5`} scroll={false}>
+    <Link
+      href={`/blog?page=${targetPage}`}
+      className={`${base} text-primary hover:bg-primary/5`}
+      scroll={false}
+    >
       {children}
     </Link>
   );

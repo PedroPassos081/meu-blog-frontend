@@ -9,6 +9,7 @@ import Services from "@/sections/Services";
 import About from "@/sections/About";
 import Contact from "./contact/page";
 import BlogPage from "./blog/page";
+import Testimonials from "@/sections/Testimonials";
 
 export const metadata: Metadata = {
   title: "VET Dev",
@@ -27,6 +28,7 @@ export default function RootLayout({
       {children}
       <About id="about" />
       <BlogPage />
+      <Testimonials />
       <Contact />
     </>
   );

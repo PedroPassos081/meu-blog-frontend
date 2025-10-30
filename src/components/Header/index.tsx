@@ -9,9 +9,10 @@ type NavItem = { href: string; label: string };
 
 const nav: NavItem[] = [
   { href: "/", label: "Home" },
-  { href: "/#about", label: "Sobre Nós" }, 
+  { href: "/#about", label: "Sobre Nós" },
   { href: "/servicos", label: "Serviços" },
   { href: "/blog", label: "Blog" },
+  { href: "/#depoimentos", label: "Depoimentos" },
 ];
 
 export default function Header() {
