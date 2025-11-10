@@ -4,18 +4,24 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Ambiente local (Strapi rodando em http://localhost:1337)
+      // Strapi local (quando usar localhost)
       {
         protocol: "http",
         hostname: "localhost",
         port: "1337",
         pathname: "/uploads/**",
       },
-      // Strapi Cloud (seu projeto)
+      // Domínio do seu Strapi Cloud (API/admin pode servir assets também)
       {
         protocol: "https",
         hostname: "playful-unity-868528a03e.strapiapp.com",
-        pathname: "/uploads/**",
+        pathname: "/**", // aceita qualquer caminho
+      },
+      // Domínio de mídia do Strapi Cloud (onde sua imagem está)
+      {
+        protocol: "https",
+        hostname: "playful-unity-868528a03e.media.strapiapp.com",
+        pathname: "/**", // importante: aqui não há /uploads
       },
     ],
   },
