@@ -11,11 +11,13 @@ function getToken() {
   return process.env.STRAPI_API_TOKEN || "";
 }
 
-const CONTENT_UID = "posts" as const;
-const COVER_FIELD = "imagem_destaque" as const;
-const TITLE_FIELD = "titulo" as const;
+// substitua suas constantes por estas:
+const CONTENT_UID = "articles" as const;
+const COVER_FIELD = "cover" as const;
+const TITLE_FIELD = "title" as const;
 const SLUG_FIELD = "slug" as const;
-const CONTENT_FIELD = "conteudo" as const;
+const CONTENT_FIELD = "blocks" as const; // corpo (Dynamic Zone)
+
 const DEFAULT_PAGE_SIZE = 9 as const;
 
 /* ===================== Tipos ===================== */
