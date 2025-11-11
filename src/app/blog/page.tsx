@@ -29,6 +29,7 @@ type PostAttrs = {
   [SLUG_FIELD]: string;
   [CONTENT_FIELD]?: unknown;
   publishedAt: string;
+  description?: string; // fallback opcional para o excerpt
   [COVER_FIELD]?: StrapiFile<StrapiImage> | StrapiImage | null;
 };
 
@@ -132,6 +133,7 @@ async function getPosts(
     "pagination[page]": String(page),
     "pagination[pageSize]": String(pageSize),
     [`populate[${COVER_FIELD}]`]: "true",
+    [`populate[${CONTENT_FIELD}]`]: "true", // <— necessário para gerar excerpt
   });
 
   const headers: HeadersInit = {};
@@ -205,7 +207,8 @@ export default async function BlogPage({
                 const title = a[TITLE_FIELD];
                 const slug = a[SLUG_FIELD];
                 const cover = buildImageUrl(toMediaField(a[COVER_FIELD]));
-                const excerpt = blocksToExcerpt(a[CONTENT_FIELD]);
+                const excerpt =
+                  blocksToExcerpt(a[CONTENT_FIELD], 220) || a.description || "";
 
                 return (
                   <article

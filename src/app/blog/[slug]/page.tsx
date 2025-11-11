@@ -1,152 +1,297 @@
-import Link from "next/link";
+// src/app/blog/[slug]/page.tsx
 import Image from "next/image";
-import { BlocksRenderer } from "@strapi/blocks-react-renderer";
-import type { BlocksContent } from "@strapi/blocks-react-renderer";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { marked } from "marked";
+import DOMPurify from "isomorphic-dompurify";
 
-/* ========= Tipos ========= */
-type StrapiImage = {
-  url: string;
-  alternativeText?: string;
-};
-
-
-type FlatPost = {
-  id: number;
-  titulo: string;
-  conteudo: BlocksContent | null;
-  slug: string;
-  imagem_destaque?: StrapiImage | null;
-};
-
-/* ========= Utils ========= */
-function buildImageUrl(file?: StrapiImage | null) {
-  const url = file?.url;
-  if (!url) return null;
-  const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
-  return url.startsWith("http") ? url : `${strapiUrl}${url}`;
+/* ===================== ENV ===================== */
+function getBase(): string {
+  return process.env.NEXT_PUBLIC_STRAPI_URL || "";
+}
+function getToken(): string {
+  return process.env.STRAPI_API_TOKEN || "";
 }
 
-/* ========= Fetch ========= */
-async function getPost(slug: string): Promise<FlatPost | null> {
+/* ===================== Strapi base types ===================== */
+type StrapiData<T> = { id: number; attributes: T };
+type StrapiListResponse<T> = { data: Array<StrapiData<T> | T> };
+type Relation<T> = { data: StrapiData<T> | null } | null;
+
+type StrapiImage = { url: string; alternativeText?: string };
+type StrapiFile<T> = { data?: { attributes: T } | null } | null;
+
+/* ===================== Blocks (dynamic zone) ===================== */
+type RichTextBlock = {
+  __component: string; // ex.: "shared.rich-text"
+  body?: string; // Markdown
+  content?: string; // fallback em Markdown
+};
+type QuoteBlock = {
+  __component: string;
+  text?: string;
+  quote?: string;
+  author?: string;
+};
+type MediaBlock = {
+  __component: string;
+  file?: StrapiFile<StrapiImage>;
+  image?: StrapiFile<StrapiImage>;
+  alt?: string;
+};
+type Block = RichTextBlock | QuoteBlock | MediaBlock | Record<string, unknown>;
+
+/* ===================== Article schema (starter) ===================== */
+type Author = { name?: string };
+type Category = { name?: string };
+
+type ArticleAttrs = {
+  title?: string;
+  slug?: string;
+  description?: string;
+  publishedAt?: string;
+  cover?: StrapiFile<StrapiImage> | StrapiImage | null;
+  author?: Relation<Author>;
+  category?: Relation<Category>;
+  blocks?: Block[];
+};
+
+/* ===================== Utils ===================== */
+function hasAttributes<T>(v: unknown): v is StrapiData<T> {
+  return typeof v === "object" && v !== null && "attributes" in (v as object);
+}
+function getAttrs<T>(item: StrapiData<T> | T): T {
+  return hasAttributes<T>(item) ? item.attributes : (item as T);
+}
+function buildImageUrl(
+  file?: StrapiFile<StrapiImage> | StrapiImage | null
+): string | null {
+  const BASE = getBase();
+  const direct =
+    (file as StrapiImage | undefined)?.url ??
+    (file as StrapiFile<StrapiImage> | undefined)?.data?.attributes?.url;
+  if (!direct) return null;
+  return direct.startsWith("http") ? direct : `${BASE}${direct}`;
+}
+function formatDate(iso?: string): string {
+  if (!iso) return "";
   try {
-    const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
-
-    const res = await fetch(
-      `${strapiUrl}/api/posts?filters[slug][$eq]=${slug}&populate=imagem_destaque`,
-      { next: { revalidate: 60 } }
-    );
-
-    if (!res.ok) throw new Error("Falha ao buscar o post");
-
-    const data = (await res.json()) as {
-      data: {
-        id: number;
-        attributes?: Omit<FlatPost, "id">;
-      }[];
-    };
-
-    if (data.data && data.data.length > 0) {
-  const raw = data.data[0];
-  return raw.attributes
-    ? ({ id: raw.id, ...raw.attributes } as FlatPost)
-    : (raw as FlatPost); // caso sua API já venha “flat”
-}
-
-
-    return null;
-  } catch (error) {
-    console.error("ERRO AO BUSCAR POST:", error);
-    return null;
+    return new Date(iso).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return iso ?? "";
   }
 }
 
-/* ========= Página ========= */
-export default async function PostPage({ params }: { params: { slug: string } }) {
-  const post = await getPost(params.slug);
+/* ===================== Data ===================== */
+async function fetchArticleBySlug(
+  slug: string
+): Promise<StrapiData<ArticleAttrs> | ArticleAttrs | null> {
+  const BASE = getBase();
+  if (!BASE) return null;
 
-  if (!post) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24 text-center">
-        <h1 className="text-4xl font-bold mb-4">Post não encontrado</h1>
-        <Link href="/blog" className="text-[--color-primary] hover:underline">
-          Voltar para o blog
-        </Link>
-      </main>
-    );
+  const qs = new URLSearchParams({
+    "filters[slug][$eq]": slug,
+    "populate[cover]": "true",
+    "populate[author]": "true",
+    "populate[category]": "true",
+    "populate[blocks]": "true",
+  });
+
+  const headers: HeadersInit = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}/api/articles?${qs.toString()}`, {
+    headers,
+    next: { revalidate: 60 },
+  });
+
+  if (!res.ok) {
+    if (res.status === 403) return null;
+    throw new Error(`Erro Strapi ${res.status}: ${await res.text()}`);
   }
 
-  const imageUrl = buildImageUrl(post.imagem_destaque);
+  const json = (await res.json()) as StrapiListResponse<ArticleAttrs>;
+  return json.data[0] ?? null;
+}
+
+/* ===================== Render dos blocks (Markdown → HTML) ===================== */
+function RenderBlocks({ blocks }: { blocks: Block[] }) {
+  // Garante GFM e <br> em quebras simples
+  marked.setOptions({
+    gfm: true,
+    breaks: true,
+  });
+
+  if (!Array.isArray(blocks) || blocks.length === 0) {
+    return <p>Sem conteúdo.</p>;
+  }
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-8 sm:p-24 bg-[--color-surface] text-[--color-text-main]">
-      <div className="w-full max-w-3xl bg-white p-8 rounded-2xl shadow-sm ring-1 ring-black/5">
-        {/* ===== BOTÃO DE VOLTAR (TOPO) ===== */}
-        <div className="mb-8">
-          <Link
-            href="/blog"
-            className="inline-flex items-center gap-2 rounded-full bg-[--color-primary]/10 px-4 py-2 text-sm font-medium text-[--color-primary] transition hover:bg-[--color-primary]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-accent]/40"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
+    <>
+      {blocks.map((b, idx) => {
+        const comp = String((b as { __component?: string }).__component || "");
+
+        // RICH TEXT (Markdown no Strapi)
+        if (comp.includes("rich") || "body" in b || "content" in b) {
+          const md =
+            (b as RichTextBlock).body ?? (b as RichTextBlock).content ?? "";
+          const html = DOMPurify.sanitize(marked.parse(md) as string);
+          return (
+            <div
+              key={idx}
+              className="
+                prose prose-lg max-w-none
+                prose-headings:font-bold prose-headings:text-teal-800
+                prose-h2:text-2xl prose-h3:text-xl
+                prose-a:text-teal-700 hover:prose-a:underline
+                prose-strong:text-teal-900 prose-li:marker:text-teal-600
+                leading-relaxed
+
+                [&_p]:my-5 [&_p]:leading-7
+                [&_h2]:mt-10 [&_h2]:mb-5
+                [&_h3]:mt-8  [&_h3]:mb-4
+                [&_ul]:my-6  [&_ol]:my-6  [&_li]:my-1
+                [&_blockquote]:my-6 [&_blockquote]:pl-4 [&_blockquote]:border-l-4 [&_blockquote]:border-teal-500
+                [&_img]:my-6
+                [&_hr]:my-10
+              "
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          );
+        }
+
+        // QUOTE
+        if (comp.includes("quote")) {
+          const qb = b as QuoteBlock;
+          const text = qb.text ?? qb.quote ?? "";
+          return (
+            <blockquote
+              key={idx}
+              className="border-l-4 border-teal-500 pl-4 italic text-neutral-800 my-6"
             >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-            Voltar para o blog
-          </Link>
+              <p>{text}</p>
+              {qb.author ? (
+                <footer className="mt-1 not-italic text-sm text-neutral-500">
+                  — {qb.author}
+                </footer>
+              ) : null}
+            </blockquote>
+          );
+        }
+
+        // MEDIA
+        if (comp.includes("media") || "file" in b || "image" in b) {
+          const mb = b as MediaBlock;
+          const url = buildImageUrl(mb.file ?? mb.image ?? null);
+          if (!url) return null;
+          return (
+            <div key={idx} className="my-6 overflow-hidden rounded-2xl">
+              <Image
+                src={url}
+                alt={mb.alt ?? "Imagem"}
+                width={1200}
+                height={700}
+                className="h-auto w-full object-cover"
+              />
+            </div>
+          );
+        }
+
+        // FALLBACK
+        return (
+          <pre
+            key={idx}
+            className="my-4 overflow-auto rounded bg-neutral-50 p-4 text-xs text-neutral-700"
+          >
+            {JSON.stringify(b, null, 2)}
+          </pre>
+        );
+      })}
+    </>
+  );
+}
+
+/* ===================== Page ===================== */
+export default async function ArticlePage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const item = await fetchArticleBySlug(params.slug);
+  if (!item) return notFound();
+
+  const a = getAttrs<ArticleAttrs>(item);
+  if (!a?.slug) return notFound();
+
+  const title = a.title ?? "";
+  const date = a.publishedAt;
+  const cover = buildImageUrl(a.cover ?? null);
+  const authorName = a.author?.data?.attributes?.name;
+  const categoryName = a.category?.data?.attributes?.name;
+  const blocks = a.blocks ?? [];
+
+  return (
+    <main className="bg-white text-black">
+      <section className="mx-auto max-w-3xl px-6 py-10">
+        <Link href="/blog" className="text-sm text-teal-700 hover:underline">
+          ← Voltar para o blog
+        </Link>
+
+        <h1 className="mt-3 text-3xl font-extrabold text-teal-900">{title}</h1>
+
+        <div className="mt-2 text-sm text-neutral-600">
+          <time dateTime={date}>{formatDate(date)}</time>
+          {authorName ? <> · {authorName}</> : null}
+          {categoryName ? <> · {categoryName}</> : null}
         </div>
 
-        {/* ===== IMAGEM DE CAPA ===== */}
-        {imageUrl && (
-          <div className="relative w-full h-64 md:h-80 mb-8 rounded-xl overflow-hidden">
+        {cover && (
+          <div className="mt-6 overflow-hidden rounded-2xl">
             <Image
-              src={imageUrl}
-              alt={post.imagem_destaque?.alternativeText || post.titulo}
-              fill
-              className="object-cover"
+              src={cover}
+              alt={title}
+              width={1200}
+              height={630}
+              className="h-auto w-full object-cover"
               priority
             />
           </div>
         )}
 
-        {/* ===== TÍTULO ===== */}
-        <h1 className="text-4xl sm:text-5xl font-extrabold mb-8 text-[--color-text-main]">
-          {post.titulo}
-        </h1>
-
-        {/* ===== CONTEÚDO ===== */}
-        <div className="prose prose-lg max-w-none text-[--color-text-main] prose-headings:text-[--color-primary] prose-a:text-[--color-accent] hover:prose-a:underline">
-  {post.conteudo && <BlocksRenderer content={post.conteudo} />} 
-</div>
-
-        {/* ===== BOTÃO DE VOLTAR (FINAL) ===== */}
-        <div className="mt-12 border-t pt-6 flex justify-center">
-          <Link
-            href="/blog"
-            className="inline-flex items-center gap-2 rounded-full bg-[--color-primary]/10 px-4 py-2 text-sm font-medium text-[--color-primary] transition hover:bg-[--color-primary]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-accent]/40"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-            Voltar para o blog
-          </Link>
-        </div>
-      </div>
+        <article className="mt-8">
+          <RenderBlocks blocks={blocks} />
+        </article>
+      </section>
     </main>
   );
+}
+
+/* ===================== Metadata (SEO) ===================== */
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const item = await fetchArticleBySlug(params.slug);
+  if (!item) return { title: "Post não encontrado" };
+
+  const a = getAttrs<ArticleAttrs>(item);
+  const title = a.title ?? "Artigo";
+  const desc = a.description ?? "";
+  const image = buildImageUrl(a.cover ?? null);
+
+  return {
+    title,
+    description: desc,
+    openGraph: {
+      title,
+      description: desc,
+      images: image ? [{ url: image }] : [],
+    },
+  };
 }
