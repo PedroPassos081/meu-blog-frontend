@@ -22,24 +22,57 @@ type StrapiImage = { url: string; alternativeText?: string };
 type StrapiFile<T> = { data?: { attributes: T } | null } | null;
 
 /* ===================== Blocks (dynamic zone) ===================== */
-type RichTextBlock = {
-  __component: string; // ex.: "shared.rich-text"
+type BaseBlock = { __component?: string };
+
+type RichTextBlock = BaseBlock & {
+  // ex.: "shared.rich-text"
   body?: string; // Markdown
   content?: string; // fallback em Markdown
 };
-type QuoteBlock = {
-  __component: string;
+type QuoteBlock = BaseBlock & {
+  __component?: string;
   text?: string;
   quote?: string;
   author?: string;
 };
-type MediaBlock = {
-  __component: string;
+type MediaBlock = BaseBlock & {
+  __component?: string;
   file?: StrapiFile<StrapiImage>;
   image?: StrapiFile<StrapiImage>;
   alt?: string;
 };
-type Block = RichTextBlock | QuoteBlock | MediaBlock | Record<string, unknown>;
+
+type Block = RichTextBlock | QuoteBlock | MediaBlock | BaseBlock;
+
+/* ======== Type guards seguros (sem any) ======== */
+function isObjectRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+function isRichText(b: Block | unknown): b is RichTextBlock {
+  if (!isObjectRecord(b)) return false;
+  const comp = typeof b.__component === "string" ? b.__component : "";
+  return (
+    comp.includes("rich") ||
+    typeof (b as { body?: unknown }).body === "string" ||
+    typeof (b as { content?: unknown }).content === "string"
+  );
+}
+function isQuote(b: Block | unknown): b is QuoteBlock {
+  if (!isObjectRecord(b)) return false;
+  const comp = typeof b.__component === "string" ? b.__component : "";
+  return (
+    comp.includes("quote") ||
+    typeof (b as { text?: unknown }).text === "string" ||
+    typeof (b as { quote?: unknown }).quote === "string"
+  );
+}
+function isMedia(b: Block | unknown): b is MediaBlock {
+  if (!isObjectRecord(b)) return false;
+  const comp = typeof b.__component === "string" ? b.__component : "";
+  const hasFile = "file" in b;
+  const hasImage = "image" in b;
+  return comp.includes("media") || hasFile || hasImage;
+}
 
 /* ===================== Article schema (starter) ===================== */
 type Author = { name?: string };
@@ -134,13 +167,10 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
   return (
     <>
       {blocks.map((b, idx) => {
-        const comp = String((b as { __component?: string }).__component || "");
-
         // RICH TEXT (Markdown no Strapi)
-        if (comp.includes("rich") || "body" in b || "content" in b) {
-          const md =
-            (b as RichTextBlock).body ?? (b as RichTextBlock).content ?? "";
-          const html = DOMPurify.sanitize(marked.parse(md) as string);
+        if (isRichText(b)) {
+          const md = b.body ?? b.content ?? "";
+          const html = DOMPurify.sanitize((marked.parse(md) as string) || "");
           return (
             <div
               key={idx}
@@ -166,18 +196,18 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
         }
 
         // QUOTE
-        if (comp.includes("quote")) {
-          const qb = b as QuoteBlock;
-          const text = qb.text ?? qb.quote ?? "";
+        if (isQuote(b)) {
+          const text = b.text ?? b.quote ?? "";
+          const author = b.author ?? "";
           return (
             <blockquote
               key={idx}
               className="border-l-4 border-teal-500 pl-4 italic text-neutral-800 my-6"
             >
               <p>{text}</p>
-              {qb.author ? (
+              {author ? (
                 <footer className="mt-1 not-italic text-sm text-neutral-500">
-                  — {qb.author}
+                  — {author}
                 </footer>
               ) : null}
             </blockquote>
@@ -185,15 +215,14 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
         }
 
         // MEDIA
-        if (comp.includes("media") || "file" in b || "image" in b) {
-          const mb = b as MediaBlock;
-          const url = buildImageUrl(mb.file ?? mb.image ?? null);
+        if (isMedia(b)) {
+          const url = buildImageUrl(b.file ?? b.image ?? null);
           if (!url) return null;
           return (
             <div key={idx} className="my-6 overflow-hidden rounded-2xl">
               <Image
                 src={url}
-                alt={mb.alt ?? "Imagem"}
+                alt={b.alt ?? "Imagem"}
                 width={1200}
                 height={700}
                 className="h-auto w-full object-cover"
@@ -202,7 +231,7 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
           );
         }
 
-        // FALLBACK
+        // FALLBACK (bloco desconhecido)
         return (
           <pre
             key={idx}
@@ -253,7 +282,7 @@ export default async function ArticlePage({
         {cover && (
           <div className="mt-6 overflow-hidden rounded-2xl">
             <Image
-              src={cover}
+              src={cover ?? ""}
               alt={title}
               width={1200}
               height={630}
