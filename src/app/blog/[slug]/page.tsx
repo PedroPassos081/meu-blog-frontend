@@ -3,7 +3,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
-import IsoDOMPurify from "isomorphic-dompurify";
+import sanitizeHtml, { IOptions, Attributes } from "sanitize-html";
+
+export const runtime = "nodejs";
 
 /* ===================== ENV ===================== */
 function getBase(): string {
@@ -25,16 +27,17 @@ type StrapiFile<T> = { data?: { attributes: T } | null } | null;
 type BaseBlock = { __component?: string };
 
 type RichTextBlock = BaseBlock & {
-  // ex.: "shared.rich-text"
-  body?: string; // Markdown
+  body?: string;   // Markdown
   content?: string; // fallback em Markdown
 };
+
 type QuoteBlock = BaseBlock & {
   __component?: string;
   text?: string;
   quote?: string;
   author?: string;
 };
+
 type MediaBlock = BaseBlock & {
   __component?: string;
   file?: StrapiFile<StrapiImage>;
@@ -74,7 +77,7 @@ function isMedia(b: Block | unknown): b is MediaBlock {
   return comp.includes("media") || hasFile || hasImage;
 }
 
-/* ===================== Article schema (starter) ===================== */
+/* ===================== Article schema ===================== */
 type Author = { name?: string };
 type Category = { name?: string };
 
@@ -152,32 +155,44 @@ async function fetchArticleBySlug(
   return json.data[0] ?? null;
 }
 
-type DomPurifyFn = (dirty: string) => string;
-type DomPurifyObj = { sanitize: (dirty: string) => string };
+/* ===================== Markdown → HTML (sanitizado no SSR) ===================== */
+const SANITIZE_OPTIONS: IOptions = {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+    "img", "h1","h2","h3","h4","h5","h6","figure","figcaption","hr",
+  ]),
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    a: ["href", "name", "target", "rel"],
+    img: ["src", "alt", "title", "width", "height", "srcset", "sizes"],
+  },
+  transformTags: {
+    a: (tagName: string, attribs: Attributes) => {
+      // clone tipado
+      const out: Attributes = { ...attribs };
 
-function isDomPurifyFn(x: unknown): x is DomPurifyFn {
-  return typeof x === "function";
+      if (attribs.target === "_blank") {
+        out.rel = "noopener noreferrer"; // sempre string
+      } else {
+        // se vier "rel" sem ser string válida, remova
+        if ("rel" in out) {
+          // Attributes é { [k: string]: string }, então delete é válido:
+          delete (out as Record<string, string>)["rel"];
+        }
+      }
+
+      return { tagName: "a", attribs: out };
+    },
+  },
+};
+
+function markdownToSafeHtml(md: string): string {
+  marked.setOptions({ gfm: true, breaks: true });
+  const dirty = (marked.parse(md) as string) || "";
+  return sanitizeHtml(dirty, SANITIZE_OPTIONS);
 }
-function isDomPurifyObj(x: unknown): x is DomPurifyObj {
-  return typeof x === "object" && x !== null && typeof (x as Record<string, unknown>).sanitize === "function";
-}
 
-function sanitizeHtmlSSR(html: string): string {
-  const dp: unknown = IsoDOMPurify; // <- usa o mesmo nome importado
-  if (isDomPurifyFn(dp)) return dp(html);
-  if (isDomPurifyObj(dp)) return dp.sanitize(html);
-  return html; // fallback seguro
-}
-
-
-/* ===================== Render dos blocks (Markdown → HTML) ===================== */
+/* ===================== Render dos blocks ===================== */
 function RenderBlocks({ blocks }: { blocks: Block[] }) {
-  // Garante GFM e <br> em quebras simples
-  marked.setOptions({
-    gfm: true,
-    breaks: true,
-  });
-
   if (!Array.isArray(blocks) || blocks.length === 0) {
     return <p>Sem conteúdo.</p>;
   }
@@ -185,10 +200,11 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
   return (
     <>
       {blocks.map((b, idx) => {
-        // RICH TEXT (Markdown no Strapi)
+        // RICH TEXT (Markdown vindo do Strapi)
         if (isRichText(b)) {
           const md = b.body ?? b.content ?? "";
-          const html = sanitizeHtmlSSR((marked.parse(md) as string) || "");
+          const html = markdownToSafeHtml(md);
+
           return (
             <div
               key={idx}
@@ -292,7 +308,7 @@ export default async function ArticlePage({
         <h1 className="mt-3 text-3xl font-extrabold text-teal-900">{title}</h1>
 
         <div className="mt-2 text-sm text-neutral-600">
-          <time dateTime={date}>{formatDate(date)}</time>
+          <time dateTime={date ?? undefined}>{formatDate(date)}</time>
           {authorName ? <> · {authorName}</> : null}
           {categoryName ? <> · {categoryName}</> : null}
         </div>
@@ -300,7 +316,7 @@ export default async function ArticlePage({
         {cover && (
           <div className="mt-6 overflow-hidden rounded-2xl">
             <Image
-              src={cover ?? ""}
+              src={cover}
               alt={title}
               width={1200}
               height={630}

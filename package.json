@@ -11,14 +11,13 @@
   "dependencies": {
     "@strapi/blocks-react-renderer": "^1.0.2",
     "@tailwindcss/typography": "^0.5.19",
-    "dompurify": "^3.3.0",
-    "isomorphic-dompurify": "^2.30.0",
     "marked": "^17.0.0",
     "next": "15.5.4",
     "parse5": "6.0.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "sanitize-html": "^2.17.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -26,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sanitize-html": "^2.16.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
