@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
-import DOMPurify from "dompurify";
+import IsoDOMPurify from "isomorphic-dompurify";
 
 /* ===================== ENV ===================== */
 function getBase(): string {
@@ -152,6 +152,24 @@ async function fetchArticleBySlug(
   return json.data[0] ?? null;
 }
 
+type DomPurifyFn = (dirty: string) => string;
+type DomPurifyObj = { sanitize: (dirty: string) => string };
+
+function isDomPurifyFn(x: unknown): x is DomPurifyFn {
+  return typeof x === "function";
+}
+function isDomPurifyObj(x: unknown): x is DomPurifyObj {
+  return typeof x === "object" && x !== null && typeof (x as Record<string, unknown>).sanitize === "function";
+}
+
+function sanitizeHtmlSSR(html: string): string {
+  const dp: unknown = IsoDOMPurify; // <- usa o mesmo nome importado
+  if (isDomPurifyFn(dp)) return dp(html);
+  if (isDomPurifyObj(dp)) return dp.sanitize(html);
+  return html; // fallback seguro
+}
+
+
 /* ===================== Render dos blocks (Markdown → HTML) ===================== */
 function RenderBlocks({ blocks }: { blocks: Block[] }) {
   // Garante GFM e <br> em quebras simples
@@ -170,7 +188,7 @@ function RenderBlocks({ blocks }: { blocks: Block[] }) {
         // RICH TEXT (Markdown no Strapi)
         if (isRichText(b)) {
           const md = b.body ?? b.content ?? "";
-          const html = DOMPurify.sanitize((marked.parse(md) as string) || "");
+          const html = sanitizeHtmlSSR((marked.parse(md) as string) || "");
           return (
             <div
               key={idx}

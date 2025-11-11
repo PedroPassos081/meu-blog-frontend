@@ -12,6 +12,7 @@
     "@strapi/blocks-react-renderer": "^1.0.2",
     "@tailwindcss/typography": "^0.5.19",
     "dompurify": "^3.3.0",
+    "isomorphic-dompurify": "^2.30.0",
     "marked": "^17.0.0",
     "next": "15.5.4",
     "parse5": "6.0.1",
