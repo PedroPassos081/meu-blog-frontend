@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { marked } from "marked";
-import DOMPurify from "isomorphic-dompurify";
+import DOMPurify from "dompurify";
 
 /* ===================== ENV ===================== */
 function getBase(): string {
